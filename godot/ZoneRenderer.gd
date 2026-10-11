@@ -1634,6 +1634,7 @@ var _asleep_seen := {}          # Vector2i -> creature name: who slept LAST turn
 var _asleep_next := {}          # ...being collected for next turn
 
 func _rebuild_dynamics(cells: Array) -> void:
+	Profiler.begin("live.actors")
 	# THE LIT SET, AGAIN. _build_zone fills this for the static pass, but a carried torch moves and
 	# the build-time set describes wherever the player was standing when the zone was built --
 	# masking his pool against it left him in the dark the moment he walked anywhere new. Refilled
@@ -1647,8 +1648,10 @@ func _rebuild_dynamics(cells: Array) -> void:
 	_asleep_seen = _asleep_next # last turn's sleepers, for the missed-window case (_asleep_now)
 	_asleep_next = {}
 	_occupied.clear()
+	Profiler.begin("actors.free")
 	for c in _dynamic_root.get_children():
 		c.free()
+	Profiler.done("actors.free")
 	_orbiters.clear()           # those orbiter roots were children of _dynamic_root (just freed)
 	_anim_items.clear()         # animator registries: nodes were _dynamic_root children (freed above)
 	_float_sprites.clear()      # ...and the floaters, whose sprites were freed with them
@@ -1740,16 +1743,23 @@ func _rebuild_dynamics(cells: Array) -> void:
 			if not lit_here and _is_burning(od):
 				_place_burning(cx, cy)
 				lit_here = true
-			if not _is_prism(od) and _is_door(String(od.get("tile", ""))):
+			var door := _is_door(String(od.get("tile", "")))
+			if not door and not od.has("animGas") and not _is_creature(od):
+				idx += 1
+				continue
+			var prism := _is_prism(od)
+			if not prism and door:
 				# doors are stateful statics: hide the baked one, draw the
 				# CURRENT state fresh (open art after a bump, closed after)
 				for n in _door_static.get(Vector2i(cx, cy), []):
 					if is_instance_valid(n):
 						(n as Node3D).visible = false
+				Profiler.begin("actors.doors")
 				_place_nonwall(od, cx, cy, idx, false, sink, wet, false, false, lf)
+				Profiler.done("actors.doors")
 				idx += 1
 				continue
-			if not _is_prism(od) and od.has("animGas"):
+			if not prism and od.has("animGas"):
 				# gas drifts per turn — placed here since the statics refuse it (see _build_zone).
 				# hideDark is true on gas: out of sight it simply isn't drawn, as Qud does.
 				if not _cell_seen(cell):
@@ -1758,7 +1768,7 @@ func _rebuild_dynamics(cells: Array) -> void:
 				_register_anim(od, cx, cy)
 				idx += 1
 				continue
-			if not _is_prism(od) and _is_creature(od):
+			if not prism and _is_creature(od):
 				# USER-MODE FOG FOR CREATURES — the rule that never existed. Out of sight, a
 				# creature was simply multiplied by _light_frac, which is 0.0 at light<=None:
 				# an ordinary (hideDark) creature became an invisible black blob on dark ground
@@ -1811,6 +1821,7 @@ func _rebuild_dynamics(cells: Array) -> void:
 	# a "children added since we started this cell" range misses exactly the node that matters,
 	# which is how the player kept appearing in front of the first-person camera after the first
 	# fix. Where a node IS cannot be faked by pooling.
+	Profiler.begin("actors.finish")
 	_tag_player_cell()
 	# The held torch rides the dynamic pass, like the creature it belongs to: it moves every step,
 	# and it must be freed and rebuilt with the rest of _dynamic_root rather than baked into a
@@ -1857,21 +1868,31 @@ func _rebuild_dynamics(cells: Array) -> void:
 	# disappears. Outside the zone is always unvisited; it always needs its darkness.
 	# The band starts at the edge ring's own tone, so that has to be measured before it is built —
 	# and NOT inside _build_darkness, which is skipped entirely when the zone has nothing dark in it.
+	Profiler.done("actors.finish")
+	Profiler.done("live.actors")
+	Profiler.begin("live.surround")
 	_tally_edge_tone(cells)
 	_build_unexplored(_dynamic_root)
+	Profiler.done("live.surround")
 	if any_dark:
+		Profiler.begin("live.darkness")
 		var dnode := _swap_dark()
 		_build_darkness(cells, dnode)                  # fall off to black around light sources
 		_tag_layer(dnode, DARK_LAYER)                  # ...on its own layer — see DARK_LAYER
+		Profiler.done("live.darkness")
+		Profiler.begin("live.relight")
 		if not _one_to_one:
 			_relight_static_sprites(cells)             # dim trees/brinestalks/fences by cell light
+		Profiler.done("live.relight")
 	elif _was_dark:
 		_reset_static_light()                          # dark -> lit: restore full brightness, once
 	_was_dark = any_dark
 	# ...and reshape the ground pools to the light map this turn actually reports. UNCONDITIONAL,
 	# not under `any_dark`: the turn a zone stops being dark is precisely the turn its pools need
 	# their day shape, and gating this the way the relight is gated would skip it.
+	Profiler.begin("live.pools")
 	_shape_pools(cells)
+	Profiler.done("live.pools")
 	# The cutaway's lit test needs this map — but only if there are walls to fade (the world
 	# map has none, so it's skipped there entirely).
 	if not _wall_cutaway.is_empty():
@@ -3888,7 +3909,19 @@ func _cell_sink(cell: Dictionary) -> float:
 
 ## A tile path reduced to its family, so one verdict covers every variant:
 ## `sw_waterwheel_1` and `_3`, `wall_rock-10100010` and every other bitmask.
+var _tile_families := {}
+
 func tile_family(tile: String) -> String:
+	if _tile_families.has(tile):
+		return _tile_families[tile]
+	var family := _uncached_tile_family(tile)
+	# Bound memory across long journeys; eviction affects work, never classification.
+	if _tile_families.size() >= 4096:
+		_tile_families.clear()
+	_tile_families[tile] = family
+	return family
+
+func _uncached_tile_family(tile: String) -> String:
 	var t := tile.replace("\\", "/").get_file().get_basename().to_lower()
 	# 0) boilerplate asset prefix: some tiles have a slash path (Items/sw_...) and
 	# some are one flat filename (Assets_Content_Textures_Tiles_sw_axle...). Strip
@@ -6700,6 +6733,8 @@ func _vox_face(st: SurfaceTool, lo: Vector3i, hi: Vector3i, dv: Vector3i,
 ## that opens by rotating in-frame."
 ##
 ## Returns false when the art has no frame/leaf split, and the caller keeps the flat slab.
+var _derived_door_meshes := {}
+
 func _place_door_voxel(tile: String, main_c: String, detail_c: String, cx: int, cy: int,
 		idx: int, light_frac: float, closed: bool) -> bool:
 	var m := _door_model(tile)
@@ -6732,33 +6767,43 @@ func _place_door_voxel(tile: String, main_c: String, detail_c: String, cx: int, 
 	var ly0: int = m["ly0"]
 	var ly1: int = m["ly1"]
 
-	# --- FRAME: the art minus the leaf hole, as four strips ---
-	var stf := SurfaceTool.new()
-	stf.begin(Mesh.PRIMITIVE_TRIANGLES)
-	# THE FRAME IS ITS OWN SHAPE, box by box — jambs, arch cap, and the arch's inner curve where it
-	# cuts across the leaf's box (see the flood fill in _door_model_try). Four rectangles around a
-	# rectangular hole cannot describe an arch: they either square it off or, if widened to cover
-	# it, swallow the leaf pixels those rows also carry.
-	for b in m["frame_boxes"]:
-		var bx0: float = float(b[0])
-		var bx1: float = float(b[1]) + 1.0
-		var br0: float = float(b[2])
-		var br1: float = float(b[3]) + 1.0
-		_door_face(stf, bx0, bx1, br0, br1, fd, ew, col, row, w, h)
-		_door_edges(stf, bx0, bx1, br0, br1, fd, ew, col, row, w, h)
-	var fmesh_cap := SurfaceTool.new()
-	fmesh_cap.begin(Mesh.PRIMITIVE_TRIANGLES)
-	# CAP THE INSIDE OF THE OPENING. The frame is the art with a hole cut in it, and a hole cut in
-	# a two-sided slab has no sides — the reveal, the arch's soffit and the threshold were all open
-	# edges, so an open door showed the frame's own thickness as nothing at all. Capped in the FIELD
-	# colour (_world_bg), which is what Qud paints behind everything and what a cell reads as when
-	# nothing covers it: the same choice the memory wash and the deep-water backing already make.
-	# Daniel: "can we cap the inside of the door frame with the bg color?"
-	_door_edges(fmesh_cap, float(lx0), float(lx1) + 1.0, float(ly0), float(ly1) + 1.0,
-		fd, ew, col, row, w, h)
+	var mesh_key := [tile, _tiles_dir, ew]
+	var cached: Array = _derived_door_meshes.get(mesh_key, [])
+	var fmesh: ArrayMesh
+	var cmesh: ArrayMesh
+	if not cached.is_empty():
+		fmesh = cached[0]
+		cmesh = cached[1]
+	else:
+		# --- FRAME: the art minus the leaf hole, as four strips ---
+		var stf := SurfaceTool.new()
+		stf.begin(Mesh.PRIMITIVE_TRIANGLES)
+		# THE FRAME IS ITS OWN SHAPE, box by box — jambs, arch cap, and the arch's inner curve where it
+		# cuts across the leaf's box (see the flood fill in _door_model_try). Four rectangles around a
+		# rectangular hole cannot describe an arch: they either square it off or, if widened to cover
+		# it, swallow the leaf pixels those rows also carry.
+		for b in m["frame_boxes"]:
+			var bx0: float = float(b[0])
+			var bx1: float = float(b[1]) + 1.0
+			var br0: float = float(b[2])
+			var br1: float = float(b[3]) + 1.0
+			_door_face(stf, bx0, bx1, br0, br1, fd, ew, col, row, w, h)
+			_door_edges(stf, bx0, bx1, br0, br1, fd, ew, col, row, w, h)
+		var fmesh_cap := SurfaceTool.new()
+		fmesh_cap.begin(Mesh.PRIMITIVE_TRIANGLES)
+		# CAP THE INSIDE OF THE OPENING. The frame is the art with a hole cut in it, and a hole cut in
+		# a two-sided slab has no sides — the reveal, the arch's soffit and the threshold were all open
+		# edges, so an open door showed the frame's own thickness as nothing at all. Capped in the FIELD
+		# colour (_world_bg), which is what Qud paints behind everything and what a cell reads as when
+		# nothing covers it: the same choice the memory wash and the deep-water backing already make.
+		# Daniel: "can we cap the inside of the door frame with the bg color?"
+		_door_edges(fmesh_cap, float(lx0), float(lx1) + 1.0, float(ly0), float(ly1) + 1.0,
+			fd, ew, col, row, w, h)
+		fmesh = ArrayMesh.new()
+		stf.commit(fmesh)
+		cmesh = ArrayMesh.new()
+		fmesh_cap.commit(cmesh)
 	var cmi := MeshInstance3D.new()
-	var cmesh := ArrayMesh.new()
-	fmesh_cap.commit(cmesh)
 	cmi.mesh = cmesh
 	var cap_c: Color = DOOR_CAP_DEBUG_COLOR if DOOR_CAP_DEBUG else _world_bg.darkened(DOOR_CAP_DARKEN)
 	var cmat: StandardMaterial3D = _color_material(cap_c).duplicate()
@@ -6772,8 +6817,6 @@ func _place_door_voxel(tile: String, main_c: String, detail_c: String, cx: int, 
 	_track(cmi)
 	_track_door_mesh(cmi, cx, cy)
 	var fmi := MeshInstance3D.new()
-	var fmesh := ArrayMesh.new()
-	stf.commit(fmesh)
 	fmi.mesh = fmesh
 	var fmat: StandardMaterial3D = _mesh_material(tile, main_c, detail_c, btex).duplicate()
 	fmat.albedo_color = Color(lf, lf, lf)
@@ -6785,25 +6828,32 @@ func _place_door_voxel(tile: String, main_c: String, detail_c: String, cx: int, 
 	_track_door_mesh(fmi, cx, cy)
 
 	# --- LEAF: its own box, on a pivot at the hinge edge ---
-	var stl := SurfaceTool.new()
-	stl.begin(Mesh.PRIMITIVE_TRIANGLES)
 	var hinge_c: float = float(lx1) + 1.0 if bool(m["hinge_hi"]) else float(lx0)
-	# built relative to the hinge, so rotating the pivot swings it about that edge — and mapped as a
-	# DELTA for the same reason (see _door_face); the pivot holds the absolute position.
-	var span := func(c: float) -> float: return c / w
-	# ...and the leaf likewise, so its top follows the arch instead of squaring off under it. Every
-	# box is hinge-relative, which keeps the whole panel rigid under one rotation.
-	for b in m["leaf_boxes"]:
-		var lb0: float = float(b[0]) - hinge_c
-		var lb1: float = float(b[1]) + 1.0 - hinge_c
-		var lr0: float = float(b[2])
-		var lr1: float = float(b[3]) + 1.0
-		_door_face(stl, lb0, lb1, lr0, lr1, ld, ew, span, row, w, h,
-			float(b[0]), float(b[1]) + 1.0)
-		_door_edges(stl, lb0, lb1, lr0, lr1, ld, ew, span, row, w, h)
+	var lmesh: ArrayMesh
+	if not cached.is_empty():
+		lmesh = cached[2]
+	else:
+		var stl := SurfaceTool.new()
+		stl.begin(Mesh.PRIMITIVE_TRIANGLES)
+		# built relative to the hinge, so rotating the pivot swings it about that edge — and mapped as a
+		# DELTA for the same reason (see _door_face); the pivot holds the absolute position.
+		var span := func(c: float) -> float: return c / w
+		# ...and the leaf likewise, so its top follows the arch instead of squaring off under it. Every
+		# box is hinge-relative, which keeps the whole panel rigid under one rotation.
+		for b in m["leaf_boxes"]:
+			var lb0: float = float(b[0]) - hinge_c
+			var lb1: float = float(b[1]) + 1.0 - hinge_c
+			var lr0: float = float(b[2])
+			var lr1: float = float(b[3]) + 1.0
+			_door_face(stl, lb0, lb1, lr0, lr1, ld, ew, span, row, w, h,
+				float(b[0]), float(b[1]) + 1.0)
+			_door_edges(stl, lb0, lb1, lr0, lr1, ld, ew, span, row, w, h)
+		lmesh = ArrayMesh.new()
+		stl.commit(lmesh)
+		if _derived_door_meshes.size() >= 256:
+			_derived_door_meshes.clear()
+		_derived_door_meshes[mesh_key] = [fmesh, cmesh, lmesh]
 	var lmi := MeshInstance3D.new()
-	var lmesh := ArrayMesh.new()
-	stl.commit(lmesh)
 	lmi.mesh = lmesh
 	# THE LEAF IS DIMMER THAN ITS FRAME. With main and detail the same colour the recess alone
 	# carries the outline, and a recess is only visible where the light finds it — a flat-on camera

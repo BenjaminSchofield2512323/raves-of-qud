@@ -583,3 +583,40 @@ walk to wherever that family happens to exist — and it may not exist in the sa
 worth reading before voxelizing anything: a wire half is EIGHT face-disconnected pieces,
 because the art is a dashed zigzag that only reads continuous in 2D, and that is what set
 wires to one block of depth instead of two.
+
+
+## Offline CPU replay
+
+Use this for recurring movement-performance investigation. It reuses the profiler
+and a captured bridge snapshot, without launching Qud, connecting a BridgeClient,
+sending gameplay input, or creating a desktop window. It can run beside the viewer.
+
+1. Capture a snapshot through the existing read-only `control.Bridge.read_snapshot`
+   API while Qud is available, or reuse a local capture. Keep game data outside Git.
+2. Create a **fresh absolute directory** for diagnostics. Optionally copy the viewer's
+   `settings.json` there to reproduce its mode and feature choices.
+3. From the repo, run (replace executable and absolute paths for your machine):
+
+```sh
+Godot --headless --path godot --quit-after 500 \
+  --log-file /absolute/diagnostics/godot.log \
+  res://diagnostics/MovementReplay.tscn -- \
+  --diagnostics-dir=/absolute/diagnostics \
+  --snapshot=/absolute/captured-snapshot.json
+```
+
+`profile.txt` contains 20 warm repeated-snapshot timings. Preserve before/after
+reports with their source revisions and snapshot hash. Nested profiler phases
+overlap: do not add them as if they were independent. This measures CPU rebuilding;
+it does not measure movement interpolation, GPU cost, or presented frame pacing.
+
+The diagnostics flag is recognized only in headless mode. Settings and UI state use
+that directory; window placement and the viewer singleton lock are skipped. Supply
+`--log-file` as shown so the normal viewer log is not reused. The replay scene never
+instantiates Main or BridgeClient. Do not pass launcher flags or use the live support
+directory as the diagnostics directory. Invalid/missing snapshot data exits with
+a nonzero status; a good run prints `HEADLESS CPU REPLAY` and exits 0. Parse/runtime errors
+in the log invalidate the run even if the engine's frame limit ends it.
+
+Existing visibility, door and input regression tests remain separate from timing.
+No AI coordination or desktop-control session is required to repeat this command.

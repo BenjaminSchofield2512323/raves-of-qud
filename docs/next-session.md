@@ -1,4 +1,14 @@
-# Handoff — next session (written 2026-08-07, end of the feedback/parity run)
+# Current Windows fork handoff — 2026-10-11
+
+Start at [the current roadmap](roadmap.md#current-windows-fork-priority--2026-10-11).
+Movement remains too costly; the earlier visual pass did not establish smooth play.
+Use the isolated headless replay and logs without taking over the user's desktop.
+Fullscreen shortcuts are F11 and Alt+Enter. The user closed both apps; leave them closed.
+
+The upstream notes below are historical context, not this fork's current branch,
+clean-tree status, or next action.
+
+# Historical upstream handoff (written 2026-08-07)
 
 Branch `dd/main-ui-framing` (raves) + `dd/integrate` (highvisor). Everything below is committed and
 pushed; the working tree is clean.

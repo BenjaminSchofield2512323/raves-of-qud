@@ -1,5 +1,10 @@
 # Camera controls & viewer modes — Raves of Mud 2.5D/3D
 
+**Fullscreen:** F11 or Alt+Enter toggles the viewer window and saves the choice.
+The same toggle is in Options → RAVES → Fullscreen. Key repeat is ignored;
+shortcuts are suppressed while typing in a text field. This affects Raves only.
+
+
 > **Canonical for camera controls.** If another doc (README, `CLAUDE.md`, `docs/tools.md`) disagrees with
 > this page on modes, keys, or Escape behavior, **this page wins** — fix the other doc. There are **7 modes**
 > and **Escape keeps the current camera** (it does not snap to COMPASS).

@@ -61,7 +61,7 @@ const RAVES_ITEMS := [
 	{"key": "cutaway_bubble_on", "label": "See-through cutout (you + the look cursor)", "type": "toggle"},
 	{"key": "cutaway_bubble", "label": "See-through bubble radius (cells)",
 		"type": "slider", "min": 0, "max": 6, "step": 0.5},
-	{"key": "fullscreen", "label": "Fullscreen", "type": "toggle"},
+	{"key": "fullscreen", "label": "Fullscreen (F11 / Alt+Enter)", "type": "toggle"},
 	{"key": "full_info", "label": "Show full info by default", "type": "toggle"},
 	# 1:1 test — visual effects, minimal by default; turn on to build up toward Qud (apply on relaunch).
 	{"key": "fx_scanlines", "label": "1:1 test · CRT scanlines", "type": "toggle"},

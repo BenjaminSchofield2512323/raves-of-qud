@@ -141,6 +141,26 @@ an albedo *texture* are unaffected. See CLAUDE.md's debugging rules.
 
 ## 5. Lighting — exact-colour art, optional shaded geometry, simulated light effects
 
+### Movement performance (Windows, 2026-10-11)
+
+**Smooth movement remains unverified.** The Diorama screenshots and regression checks
+at `988c7dd` establish appearance and covered behavior, not frame pacing. The user
+reported movement stutter. A live 13-turn profile measured renderer CPU time at
+96.68 ms average / 175.99 ms maximum, with dynamic rebuilds the largest component.
+This is separate from GPU time and the additional parse/panel work.
+
+An isolated replay of one 2,000-cell snapshot measured 82.31 ms per render before
+optimization and 53.38 ms afterward (20 warm iterations each). This is repeated
+snapshot CPU work, not a gameplay FPS result. The change caches pure tile-family
+normalization, skips prism classification for static-only objects, and shares
+art-derived door meshes. Doors still update their placement, swing, materials and
+light every turn; geometry is keyed by tile, tile directory and orientation, bounded
+to 256 entries. The existing model cache fixes the source art for a renderer's lifetime.
+
+Fog, relighting, actor rebuilding, JSON parsing and panel updates still need work.
+Use the [offline replay](tools.md#offline-cpu-replay) before desktop automation.
+GPU/visual correctness and live frame pacing require a separate graphics run.
+
 ### Optional Diorama presentation
 
 In user mode, **Options → RAVES → 3D presentation → Diorama** selects a live,

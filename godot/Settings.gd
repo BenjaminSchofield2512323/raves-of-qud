@@ -245,6 +245,12 @@ var _data: Dictionary = {}
 var _rect_mtime := -1.0
 
 func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Explicit headless diagnostics own a separate support directory and no window/lock.
+	if InputModel.diagnostics_dir() != "":
+		DirAccess.make_dir_recursive_absolute(InputModel.support_dir())
+		_load()
+		return
 	# ── SINGLE INSTANCE, enforced by the app itself ──────────────────────────────────────
 	# Two Raves viewers (a dev run beside the exported app, or a double hv launch) both render
 	# the same bridge traffic and fight over Metal buffers — measured 2026-08-24 as paired
@@ -284,6 +290,23 @@ func _ready() -> void:
 	add_child(t)
 	t.start()
 	_poll_window_rect()
+
+func _input(event: InputEvent) -> void:
+	if not is_fullscreen_shortcut(event):
+		return
+	if TypingGuard.typing(get_viewport()):
+		return
+	get_viewport().set_input_as_handled()
+	set_value("fullscreen", not bool(get_value("fullscreen", false)))
+	save()
+
+func is_fullscreen_shortcut(event: InputEvent) -> bool:
+	if not (event is InputEventKey and event.pressed and not event.echo):
+		return false
+	if event.ctrl_pressed or event.meta_pressed or event.shift_pressed:
+		return false
+	return (event.keycode == KEY_F11 and not event.alt_pressed) or \
+		(event.keycode == KEY_ENTER and event.alt_pressed)
 
 func _poll_window_rect() -> void:
 	var path := InputModel.support_dir().path_join("window_rect.json")
@@ -350,6 +373,8 @@ func save() -> void:
 
 ## Apply the settings that affect the whole app immediately (not per-view).
 func apply_global() -> void:
+	if InputModel.diagnostics_dir() != "":
+		return
 	UiFont.scale = clampf(float(get_value("font_scale", 1.0)), 0.6, 2.0)
 	var fs := bool(get_value("fullscreen", false))
 	var want := DisplayServer.WINDOW_MODE_FULLSCREEN if fs else DisplayServer.WINDOW_MODE_WINDOWED

@@ -1,5 +1,20 @@
 # Testing: what to run, and when
 
+## Windows movement/fullscreen checkpoint — 2026-10-11
+
+All 53 headless scene/script checks and Python audits passed across the suite and
+targeted reruns. The keybinding fixture needed write access to Godot's test directory;
+Python audits were rerun with `python3` mapped to the installed `python` executable.
+New regressions cover fullscreen input and cached door geometry, including opening,
+orientation, position, material lighting, fresh geometry equality and live overrides.
+The offline replay rejected missing input (exit 2) and succeeded on a subsequent valid
+capture (exit 0). See [CPU timings and limits](rendering.md#movement-performance-windows-2026-10-11).
+No desktop interaction or gameplay commands were used. Actual fullscreen presentation,
+GPU rendering and live movement remain unverified for this patch. Mod source did not
+change; its compile check was unavailable because this machine has the .NET runtime
+but no SDK. These checks do not establish that the game is smooth or visually finished.
+
+
 Two tiers, deliberately. **SPOT** is what you run constantly — seconds, no apps, cannot go flaky.
 **FULL** is what you run before shipping or after touching input/chrome — it drives both apps and
 takes minutes, and its failures need a human to read a screenshot.

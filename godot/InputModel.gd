@@ -73,6 +73,7 @@ const ACTIONS := {
 	"fly_right":   {"label": "Fly right", "desc": "Move the free camera (fly mode)", "cat": "Camera", "scheme": "kbd", "key": KEY_D, "legend": "D"},
 
 	# --- view / tools ---------------------------------------------------------
+	"fullscreen": {"label": "Fullscreen", "desc": "Toggle fullscreen (also Alt+Enter)", "cat": "View", "scheme": "any", "key": KEY_F11, "legend": "F11"},
 	"inspect":      {"label": "Inspect tile", "desc": "Inspect the tile under the cursor", "cat": "View", "scheme": "any", "key": KEY_I, "legend": "I"},
 	"screenshot":   {"label": "Screenshot", "desc": "Save the viewport (and ask Qud for its own)", "cat": "View", "scheme": "any", "key": KEY_F12, "legend": "F12"},
 	"dump_profile": {"label": "Dump profile", "desc": "Write the frame-timing profile", "cat": "Debug", "scheme": "any", "key": KEY_P, "legend": "P"},
@@ -100,7 +101,19 @@ var rebinds: Dictionary = {}
 ## does (SpecialFolder.UserProfile + /Library/Application Support/RavesOfQud), so it's
 ## the same folder as overrides.json on both Windows and macOS. Resolved WITHOUT the
 ## renderer's tiles_dir (which only exists after a turn) so onboarding works cold.
+static func diagnostics_dir() -> String:
+	if DisplayServer.get_name() == "headless":
+		for arg in OS.get_cmdline_user_args():
+			if arg.begins_with("--diagnostics-dir="):
+				var path := arg.trim_prefix("--diagnostics-dir=")
+				if path.is_absolute_path():
+					return path
+	return ""
+
 static func support_dir() -> String:
+	var diagnostic := diagnostics_dir()
+	if diagnostic != "":
+		return diagnostic
 	var home := OS.get_environment("USERPROFILE")   # Windows
 	if home == "":
 		home = OS.get_environment("HOME")           # macOS / Linux

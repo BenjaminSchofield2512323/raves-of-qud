@@ -1,5 +1,26 @@
 # World model & roadmap
 
+## Current Windows fork priority — 2026-10-11
+
+The current goal is a responsive, coherent 3D viewer over Qud's simulation.
+**Playable movement and visual quality are not yet established.** Prior Diorama
+screenshots/regressions are appearance/behavior evidence only, not performance acceptance.
+
+| Work | State | Dependency / exit gate |
+|---|---|---|
+| WIN-PERF: reduce movement stalls | In progress | First classification/door-cache patch reduces one offline CPU replay from 82.31 to 53.38 ms. Next: measure fog, parse and panel work; preserve visibility while reducing rebuilds. Exit: measured live frame pacing during representative movement and zone transitions, with no long per-turn UI stalls. |
+| WIN-DIAG: repeat diagnostics without desktop control | Implemented; CPU scope | [Offline replay](tools.md#offline-cpu-replay), isolated files and no game connection. Invalid input must fail with a nonzero status; renderer tests remain separate. GPU behavior is outside this tool's scope. |
+| WIN-VISUAL: coherent 3D presentation | Pending | Choose an art/geometry approach for one representative area, then review rendered images. A lighting preset alone does not complete this work. Timing benchmarks run alone, not beside graphics experiments. |
+
+Resume with the performance section of [rendering.md](rendering.md#movement-performance-windows-2026-10-11)
+and the offline replay. Keep Qud as simulation authority; use targeted inspection of
+its shipped assemblies when a bridge/API question needs it. No full game rewrite is
+required for these renderer fixes. Do not reopen the user's games or operate their
+desktop as part of this diagnostic command.
+
+## Upstream world-store plan (historical priority; retained design context)
+
+
 Strategy for six forward-looking asks (fog of war, remembering visited zones, memory
 freeze/unfreeze, Z-height, cross-zone distance, and a future Minecraft-style editing fork).
 The insight that shaped it: all six are the *same* architectural change wearing six hats — a
