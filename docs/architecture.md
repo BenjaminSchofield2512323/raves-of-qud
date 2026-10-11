@@ -11,6 +11,19 @@ title from the **`Brand`** autoload (`Brand.gd`, the runtime source of truth for
 attribution / URLs; `config/name` in project.godot is just the export literal) and, on Play,
 `change_scene_to_file("res://MainFrame.tscn")`. Runtime order: **MainMenu → MainFrame → Main (the Holodeck)**.
 
+### Optional automatic attachment
+
+Launch Godot with `-- --join-running` to use the normal Continue path once the bridge
+reports a live character. The request is consumed once per process, so returning to
+the title later does not force the player back into the game. Without the flag,
+startup is unchanged. `tools/launch_windows.py` uses this flag after checking the
+bridge, starts Qud through Steam only when Qud is absent, and records a bounded
+startup result in `../raves-launch-status.json`. It never terminates either app.
+
+3D presentation requires user mode, `qol_tiles3d=true`, and `qol_cameras=true`.
+The saved view in `user://raves_settings.json` can also retain a top-down camera.
+Voxel walls coexist with sprite-based creatures and objects.
+
 ## `Main.gd` is decomposed
 
 It was a ~1800-line god-object; the camera and its neighbours now live in their own files, each created in

@@ -1,5 +1,8 @@
 extends Node3D
 
+const Diorama := preload("res://DioramaStyle.gd")
+var _diorama_applied := -1
+
 ## Day/night atmosphere for the Holodeck — extracted from Main. Owns the WorldEnvironment (fog/ambient),
 ## the full-screen MULTIPLY grade (dims the 3D by time of day, UNDER the frame chrome), and the sun/moon
 ## disc billboards + a sun DirectionalLight on a per-hour arc. Main feeds it the snapshot's time + stratum
@@ -219,6 +222,10 @@ func update(t: Dictionary, depth: int, zone_center: Vector3) -> void:
 	_update_time(t)
 
 func _process(dt: float) -> void:
+	var diorama := Diorama.enabled() and not Settings.qud_shape("lighting")
+	if _env != null and _diorama_applied != int(diorama):
+		Diorama.apply_environment(_env, diorama)
+		_diorama_applied = int(diorama)
 	# Depth cue first: independent of the lighting feature, so it must precede that early return.
 	if _depthcue != null:
 		_depthcue.visible = not Settings.qud_shape("depthcue")

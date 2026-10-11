@@ -891,6 +891,11 @@ func _exec_godot_cmd(cmd: String) -> void:
 		return
 	var parts := cmd.split(" ", false)
 	match parts[0]:
+		"style":
+			# A/B the same live scene without taking a Qud turn or rebuilding geometry.
+			if parts.size() > 1 and parts[1] in ["original", "diorama"]:
+				Settings.set_value("visual_style", parts[1])
+				Settings.save()
 		"shot":
 			# `shot` — the window as it stands. `shot clean` — the same frame with the SELECTION
 			# OVERLAY dropped: the inspector's report panel is a full-height wall of text pinned

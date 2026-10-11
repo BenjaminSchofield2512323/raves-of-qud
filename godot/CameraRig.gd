@@ -1,5 +1,7 @@
 extends Node3D
 
+const Diorama := preload("res://DioramaStyle.gd")
+
 ## The Holodeck's camera rig — extracted from Main. Owns the `_pivot` + `_cam` (Camera3D) nodes, all
 ## camera modes/state/consts, and the per-frame placement math. Main feeds it the player position each
 ## snapshot and routes camera input to it; it drives where the eye sits and what it looks at.
@@ -299,11 +301,12 @@ func _compass_eye(yaw_off := 0.0, zoom := 1.0) -> Vector3:
 ## COMPASS pitch varies with zoom: shallow (COMPASS_PITCH) from COMPASS_CLOSE_DIST outward, steepening to
 ## COMPASS_PITCH_NEAR (overhead) as you zoom inside it. Smoothstepped so it arcs up-and-over at the close end.
 func _compass_pitch() -> float:
+	var far_pitch := deg_to_rad(42.0) if Diorama.enabled() else COMPASS_PITCH
 	if _dist >= COMPASS_CLOSE_DIST:
-		return COMPASS_PITCH
+		return far_pitch
 	var t: float = (_dist - DIST_MIN) / (COMPASS_CLOSE_DIST - DIST_MIN)   # 0 at min .. 1 at close
 	t = t * t * (3.0 - 2.0 * t)                                          # smoothstep
-	return lerpf(COMPASS_PITCH_NEAR, COMPASS_PITCH, t)
+	return lerpf(COMPASS_PITCH_NEAR, far_pitch, t)
 
 ## Look-target height above the player's feet: the head or the waist (` menu toggle).
 func look_h() -> float:
@@ -535,6 +538,8 @@ func _update_camera(dt: float) -> void:
 ## Orthographic + DOF-off while overhead (a flat classic map), perspective otherwise. Ortho `size` is the
 ## view's vertical span in cells: the TOP_FOLLOW span scaled by the wheel/R-F zoom.
 func _apply_top_down_camera(top: bool) -> void:
+	var diorama := Diorama.enabled() and not _one_to_one
+	_cam.fov = 60.0 if diorama and _mode != CamMode.FIRST_PERSON else 75.0
 	if top:
 		if _cam.projection != Camera3D.PROJECTION_ORTHOGONAL:
 			_cam.projection = Camera3D.PROJECTION_ORTHOGONAL
@@ -558,11 +563,18 @@ func _apply_top_down_camera(top: bool) -> void:
 		elif _right_inset > 0.0 and vp.y > 0.0:
 			var aspect := vp.x / vp.y
 			h_off = _right_inset * 0.5 * _cam.size * aspect
+	# Keep the focus clear of the sidebar. First-person and free cameras retain
+	# their literal eye positions; a lens translation would shift those eyes.
+	if diorama and _mode in [CamMode.COMPASS, CamMode.FOLLOW, CamMode.CINEMATIC, CamMode.MOUSE]:
+		var vp: Vector2 = _cam.get_viewport().get_visible_rect().size
+		var offset := Diorama.focus_offset(vp, _play_hole, _eye.distance_to(_look), _cam.fov)
+		h_off = offset.x
+		v_off = offset.y
 	_cam.h_offset = h_off
 	_cam.v_offset = v_off
 	var attrs := _cam.attributes as CameraAttributesPractical
 	if attrs != null:
-		attrs.dof_blur_far_enabled = not top
+		attrs.dof_blur_far_enabled = not top and not diorama
 
 func _top_ortho_size(zoom := 1.0) -> float:
 	if _one_to_one:

@@ -141,6 +141,28 @@ an albedo *texture* are unaffected. See CLAUDE.md's debugging rules.
 
 ## 5. Lighting — exact-colour art, optional shaded geometry, simulated light effects
 
+### Optional Diorama presentation
+
+In user mode, **Options → RAVES → 3D presentation → Diorama** selects a live,
+reversible presentation pass. It requires the 3D tiles feature. With day/night
+lighting enabled, it adds small-radius screen-space ambient occlusion to emphasize
+wall creases and a slightly brighter neutral ambient fill. It uses no bloom.
+
+The perspective camera drops distance blur, uses a 60° vertical field of view,
+and gives Compass a 42° downward angle. Compass, Follow, Cinematic and Mouse center
+their focus in the usable play area, including its sidebar inset. First person
+keeps its original field of view and literal eye position. Top-down keeps its
+orthographic framing. Qud's visibility and unexplored-cell rules are unchanged.
+
+Select **Original** to restore the previous lighting and camera presentation.
+Parity mode bypasses the pass. `DioramaStyle.gd` owns the preset and focus-offset
+calculation; `tests/diorama_style.tscn` checks real camera projections, resized play
+areas, first-person position, switching back, and mode gates.
+
+For a same-scene visual comparison, send `style original` or `style diorama`
+through the existing `tools/capture/control.py` `godot()` channel, then `shot`.
+Style changes do not send commands to Qud or consume turns.
+
 World geometry follows the `SHADED_WORLD` constant (**currently `true`** → per-pixel shaded; flip it
 `false` for the flat, fully-unshaded look). Under the unshaded path, tiles show exact colours and a real light does
 nothing to them. `SHADED_WORLD = true` switches **walls and the ground** to `PER_PIXEL` so they

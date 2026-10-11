@@ -29,6 +29,9 @@ const FRAME := Color8(0xB6, 0xA1, 0x63)
 const RAVES_ITEMS := [
 	{"key": "mode", "label": "Mode", "type": "choice",
 		"options": ["User", "1:1"], "values": ["user", "1to1"]},   # 1:1 overrides camera + panels
+	{"key": "visual_style", "label": "3D presentation (requires 3D tiles)", "type": "choice",
+		"options": ["Original", "Diorama — crisp scenery, contact shading"],
+		"values": ["original", "diorama"]},
 	# WHAT THE MINIMAP DRAWS. Daniel: "Let's have a Raves setting for minimap 1:1, or top-down
 	# camera. That should help navigate in the underworld." The first two were already built and
 	# reachable only by the panel's own toggle; the third is new. Named "source" and not "mode"
@@ -745,7 +748,7 @@ func _exit_tree() -> void:
 
 # ── option presets (save/load a whole options set) ──────────────────────────────────
 
-const RAVES_KEYS := ["font_scale", "fullscreen", "full_info", "fx_scanlines", "fx_vignette", "camera", "mode", "bridge_host", "bridge_port"]
+const RAVES_KEYS := ["font_scale", "fullscreen", "full_info", "fx_scanlines", "fx_vignette", "camera", "visual_style", "mode", "bridge_host", "bridge_port"]
 
 func _build_preset_bar() -> void:
 	var save_b := _preset_bar_button("Save preset", 0.155, 0.285)

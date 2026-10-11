@@ -2006,6 +2006,13 @@ func _process(dt: float) -> void:
 	if _status_poll_t >= 0.4:
 		_status_poll_t = 0.0
 		_poll_bridge_status()
+		# Optional launcher flow: attach once to a live game, using the normal
+		# Continue path. Returning to the title later must stay at the title.
+		if "--join-running" in OS.get_cmdline_user_args() \
+				and not get_tree().has_meta("startup_join_done") \
+				and _qud_up and _game_live and _overlay == null:
+			get_tree().set_meta("startup_join_done", true)
+			_enter_viewer.call_deferred()
 
 	# Keep the command socket alive (used only to SEND — e.g. the auto-boot command). Drain and discard
 	# anything the mod broadcasts to us so its per-client writer never stalls.

@@ -18,6 +18,7 @@ const DEFAULTS := {
 	"fx_scanlines": false,      # CRT scanline interlace
 	"fx_vignette": false,       # CRT corner vignette (Qud's HUD has none)
 	"camera": 0,                # default CameraRig.CamMode index (user mode)
+	"visual_style": "original", # optional crisp diorama presentation; applies live
 	"mode": "user",             # "user" = QoL Holodeck · "1to1" = Qud-faithful parity mode
 	                            # (1to1 hard-overrides camera + panels; see MainFrame._apply_one_to_one)
 	"bridge_host": "127.0.0.1", # which Qud to render (BridgeClient)
